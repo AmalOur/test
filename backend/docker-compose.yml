@@ -1,0 +1,65 @@
+services:
+  app:
+    build:
+      context: .
+    ports:
+      - "5000:5000"
+    depends_on:
+      - keycloak
+      - pgvector
+      - ollama
+    environment:
+      DB_CONNECTION_STRING: "postgresql://postgres:0000@pgvector:5432/vector"
+      OLLAMA_SERVER_URL: "http://ollama:11434"
+      KEYCLOAK_URL: "http://keycloak:8080/"
+    volumes:
+      - shared-data:/shared
+    networks:
+      - network1
+
+  keycloak:
+    build:
+      context: ./custom_keycloak_image
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    volumes:
+      - shared-data:/shared
+    networks:
+      - network1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  pgvector:
+    image: ankane/pgvector
+    restart: always
+    environment:
+      POSTGRES_DB: vector
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 0000
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+     - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - network1
+
+  ollama:
+    build:
+      context: ./custom_ollama_image
+    networks:
+      - network1
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434
+
+networks:
+  network1:
+
+volumes:
+  shared-data:
